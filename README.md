@@ -58,6 +58,8 @@ Available in the wild here: http://push.si
 
 Not yet on the Android market, but available for now here: https://github.com/loisaidasam/pushsi/blob/master/android/bin/Pushsi-Android.apk?raw=true
 
+Shortcut: http://bit.ly/pushsi
+
 
 ## TODO:
 
