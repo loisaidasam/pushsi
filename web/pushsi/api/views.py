@@ -191,7 +191,9 @@ def push(request):
     except Computer.DoesNotExist:
         return _return_error_response('No such computer with specified hash')
     
-    data = request.POST.dict()
+    # Dem QueryDict objects...
+    # https://docs.djangoproject.com/en/dev/ref/request-response/#querydict-objects
+    data = {k: v[0] for k, v in request.POST.iterlists()}
     del data['hash']
 
     messages_sent = 0
