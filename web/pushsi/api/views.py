@@ -191,7 +191,7 @@ def push(request):
     except Computer.DoesNotExist:
         return _return_error_response('No such computer with specified hash')
     
-    data = dict(request.POST)
+    data = request.POST.dict()
     del data['hash']
 
     messages_sent = 0
