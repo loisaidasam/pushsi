@@ -173,9 +173,8 @@ def push(request):
     ip_address = request.META.get('REMOTE_ADDR', '')
     ua_string = request.META.get('HTTP_USER_AGENT', '')
     
-    logger.debug("push(hash=%s, message=%s) - IP: %s UA: %s" % (
+    logger.debug("push(hash=%s) - IP: %s UA: %s" % (
         request.POST.get('hash'),
-        request.POST.get('message'),
         ip_address,
         ua_string,
     ))
@@ -187,22 +186,21 @@ def push(request):
     if not hash:
         return _return_error_response('No hash provided')
     
-    message = request.POST.get('message')
-    if not message:
-        return _return_error_response('No message provided')
-    
     try:
         computer = Computer.objects.get(hash=hash)
     except Computer.DoesNotExist:
         return _return_error_response('No such computer with specified hash')
     
+    data = request.POST
+    del data['hash']
+
     messages_sent = 0
     
     links = Link.objects.filter(computer=computer)
     for link in links:
         phone = link.phone
         try:
-            alert_id = PushAlert.send_push(phone, message)
+            alert_id = PushAlert.send_push(phone, data)
             if alert_id:
                 messages_sent += 1
         except PushException, e:

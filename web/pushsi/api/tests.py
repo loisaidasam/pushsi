@@ -1,11 +1,4 @@
-"""
-This file demonstrates writing tests using the unittest module. These will pass
-when you run "manage.py test".
 
-Replace this with more appropriate tests for your application.
-"""
-
-import hashlib
 import json
 
 from django.test import TestCase
@@ -114,3 +107,15 @@ class TestFlow(TestCase):
         self.assertEqual(response.status_code, 200, response_dict.get('error'))
         self.assertEqual(response_dict['phones'][0]['phone_uuid'], phone_uuid)
         
+        """
+        TODO: think of a clever way of testing push without actually doing it
+
+        # /api/push
+        params = {
+            'hash': hash,
+            'foo': 'bar',
+        }
+        response = c.post('/api/push', params)
+        response_dict = json.loads(response.content)
+        self.assertEqual(response.status_code, 200, response_dict.get('error'))
+        """

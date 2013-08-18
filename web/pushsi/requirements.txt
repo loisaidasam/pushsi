@@ -5,3 +5,4 @@ MySQL-python==1.2.3
 # to run fcgi
 #flup
 
+south

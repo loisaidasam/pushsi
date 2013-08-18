@@ -1,6 +1,7 @@
 
 import datetime
 import hashlib
+import json
 import logging
 import random
 import time
@@ -48,20 +49,18 @@ class PushProfileAndroid(models.Model):
 
 class PushAlert(models.Model):
     phone = models.ForeignKey(Phone)
-    message = models.CharField(max_length=255)
+    message = models.TextField()
     external_id = models.CharField(max_length=255)
     created = models.DateTimeField(auto_now_add=True)
 
     def __unicode__(self):
-        return "%s - %s (external_id=%s)" % (self.phone, self.message, self.external_id)
+        return "%s - external_id=%s" % (self.phone, self.external_id)
     
     @staticmethod
-    def send_push(phone, message):
-        
-        # sanitize for DB
-        message = message[:255]
-        
-        logger.info("Sending message \"%s\" to phone %s..." % (message, phone))
+    def send_push(phone, data):
+        logger.info("Sending message to phone %s..." % phone)
+
+        payload = json.dumps(data)
         
         # Android
         if phone.phone_type == PHONE_TYPE_ANDROID:
@@ -69,13 +68,13 @@ class PushAlert(models.Model):
                 push_profile = PushProfileAndroid.objects.get(phone=phone)
                 push_id = api_push.send_push(
                     PHONE_TYPE_ANDROID,
-                    message, 
+                    payload, 
                     c2dm_token=push_profile.c2dm_token
                 )
                 alert = PushAlert.objects.create(
-                    phone = phone,
-                    message = message,
-                    external_id = push_id,
+                    phone=phone,
+                    message=payload,
+                    external_id=push_id,
                 )
                 return alert.id
             except PushProfileAndroid.DoesNotExist:
