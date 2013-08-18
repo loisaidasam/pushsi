@@ -1,178 +1,161 @@
 #!/usr/bin/env python
 
 import datetime
-import hashlib
 import json
-from optparse import OptionParser
 import os
+import requests
 import subprocess
 import sys
-import urllib
-import urllib2
+import time
 
 
 API_ENDPOINT = "http://push.si/api"
+HASH_FILE_LOCATION = "%s/.PUSHSI_HASH" % os.path.expanduser("~")
 
 
-class PushsiException(Exception):
+class EmptyHashError(Exception):
     pass
 
 
-def _get_hash():
-    home_dir = os.path.expanduser("~")
-    
-    try:
-        fp = open("%s/.PUSHSI_HASH" % home_dir, 'r')
-        hash = fp.read()
-        if not hash:
-            raise PushsiException("Empty hash file")
-        return hash
-    except IOError:
-        pass
-    except PushsiException:
-        pass
-    
-    url = '%s/computer/register' % API_ENDPOINT
-    data = urllib.urlencode({})
-    req = urllib2.Request(url, data)
-    try:
-        response = urllib2.urlopen(req)
-    except urllib2.HTTPError, e:
-        response_dict = json.loads(e.read())
-        raise PushsiException(response_dict.get('error', e))
-    
-    response_dict = json.loads(response.read())
-    if response.code != 200:
-        raise PushsiException(response_dict.get('error'))
-    
-    hash = response_dict.get('hash')
-    if not hash:
-        raise PushsiException("No hash returned!")
-    
-    fp = open("%s/.PUSHSI_HASH" % home_dir, 'w')
-    fp.write(hash)
-    fp.close()
-    return hash
+class RequestError(Exception):
+    def __init__(self, error):
+        self.error = error
+        super(RequestError, self).__init__(error)
 
 
-def _register(args, hash):
-    def _usage():
-        print "Usage: %s --register <pin code>" % __file__
-    
-    if len(args) != 1:
-        return _usage()
-    
-    pin_code = args[0]
-    
-    url = '%s/pin/resolve' % API_ENDPOINT
-    params = {
-        'hash': hash,
-        'pin_code': pin_code,
-    }
+class Pushsi(object):
+    def __init__(self, pushsi_hash=None):
+        if not pushsi_hash:
+            pushsi_hash = self._get_hash()
+        self.pushsi_hash = pushsi_hash
 
-    data = urllib.urlencode(params)
-    req = urllib2.Request(url, data)
-    try:
-        response = urllib2.urlopen(req)
-    except urllib2.HTTPError, e:
-        response_dict = json.loads(e.read())
-        raise PushsiException(response_dict.get('error', e))
-    
-    response_dict = json.loads(response.read())
-    if response.code != 200:
-        raise PushsiException(response_dict.get('error'))
-    
-    status = response_dict.get('status')
-    if not status:
-        raise PushsiException("Unknown error trying to reconcile pin")
-    
-    print "Success!"
-    
+    def _make_request(self, endpoint, data=None, request_type='POST'):
+        url = '%s/%s' % (API_ENDPOINT, endpoint)
+        try:
+            if request_type == 'POST':
+                response = requests.post(url, data=data)
+            elif request_type == 'GET':
+                response = requests.get(url, params=data)
+            else:
+                raise RequestError("Invalid request_type")
+        except Exception, e:
+            raise RequestError(e)
+        if response.status_code != 200:
+            response_json = json.loads(response.text)
+            raise RequestError(response_json.get('error'))
+        return response.json()
 
-def _status(hash):
-    url = '%s/computer/status?hash=%s' % (API_ENDPOINT, hash)
-    req = urllib2.Request(url)
-    try:
-        response = urllib2.urlopen(req)
-    except urllib2.HTTPError, e:
-        response_dict = json.loads(e.read())
-        raise PushsiException(response_dict.get('error', e))
-    
-    response_dict = json.loads(response.read())
-    if response.code != 200:
-        raise PushsiException(response_dict.get('error'))
-    
-    phones = response_dict.get('phones')
-    if not phones:
-        print "No phones currently hooked up to this computer."
-        return
-    
-    print "%i phone%s currently hooked up to this computer:" % (
-        len(phones),
-        len(phones) != 1 and 's' or '',
-    )
-    print "Phone UUID:\tRegistered:"
-    for phone in phones:
-        created = datetime.datetime.fromtimestamp(phone['created'])
-        print "%s\t%s" % (phone['phone_uuid'], created)
+    def _get_hash(self):
+        # Try to get the hash locally
+        try:
+            pushsi_hash = None
+            with open(HASH_FILE_LOCATION, 'r') as fp:
+                pushsi_hash = fp.read()
+            if not pushsi_hash:
+                raise EmptyHashError()
+            return pushsi_hash
+        except (IOError, EmptyHashError):
+            pass
+        # No hash, register for one
+        data = self._make_request('computer/register')
+        pushsi_hash = data.get('hash')
+        if not pushsi_hash:
+            raise EmptyHashError("No hash returned from API request!")
+        # Save it
+        with open(HASH_FILE_LOCATION, 'w') as fp:
+            fp.write(pushsi_hash)
+        return pushsi_hash
+
+    def register(self, pin_code):
+        params = {
+            'hash': self.pushsi_hash,
+            'pin_code': pin_code,
+        }
+        self._make_request('pin/resolve', params)
+
+    def status(self):
+        params = {'hash': self.pushsi_hash}
+        data = self._make_request('computer/status', params, request_type='GET')
+        return data.get('phones')
+
+    def pushsi(self, data):
+        data['hash'] = self.pushsi_hash
+        return self._make_request('push', data)
 
 
-def _pushsi(cmd, hash, verbose):
-    def _usage():
-        print "Usage: %s <some command>" % __file__
-    
-    if not cmd:
-        return _usage()
-    
-    p = subprocess.Popen(cmd, shell=True)
-    returncode = p.wait()
-    
-    message = "Command: %s Exit status: %s" % (cmd, returncode)
-    
-    url = '%s/push' % API_ENDPOINT
-    params = {'hash': hash, 'message': message}
-    data = urllib.urlencode(params)
-    req = urllib2.Request(url, data)
-    try:
-        response = urllib2.urlopen(req)
-    except urllib2.HTTPError, e:
-        response_dict = json.loads(e.read())
-        raise PushsiException(response_dict.get('error', e))
-    
-    response_dict = json.loads(response.read())
-    if response.code != 200:
-        raise PushsiException(response_dict.get('error'))
-    
-    if verbose:
-        print "%s push message%s sent" % (
-            response_dict['messages_sent'],
-            int(response_dict['messages_sent']) != 1 and 's' or '',
-        )
+def usage():
+    msg = """Usage: pushsi [options]
+
+Options:
+  -h, --help      Show this help message and exit
+  -r, --register  Register a phone by entering a pin
+  -s, --status    Check the status of this computer - show which phones are
+                  hooked up to it
+  -v, --verbose   Be extra verbose about the push messages that are sent"""
+    print msg
 
 
 def main():
-    hash = _get_hash()
-    
-    parser = OptionParser()
-    help_text = "Register a phone by entering a pin"
-    parser.add_option("-r", "--register", action="store_true", dest="register", default=False, help=help_text)
-    help_text = "Check the status of this computer - show which phones are hooked up to it"
-    parser.add_option("-s", "--status", action="store_true", dest="status", default=False, help=help_text)
-    help_text = "Be extra verbose about the push messages that are sent"
-    parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False, help=help_text)
-    (options, args) = parser.parse_args()
-    
-    if options.register:
-        return _register(args, hash)
-    
-    if options.status:
-        return _status(hash)
-    
-    cmd = " ".join(args)
-    return _pushsi(cmd, hash, options.verbose)
+    pushsi = Pushsi()
 
-try:
+    # Note: not using optparse because we don't really want to parse all the args
+    # example: pushsi python myscript.py --custom-script-arg
+    if len(sys.argv) == 1 or sys.argv[1].lower() in ('-h', '--help'):
+        return usage()
+
+    if sys.argv[1].lower() in ('-r', '--register'):
+        if len(sys.argv) < 3:
+            print "Error: must specify a pin code to register"
+            sys.exit(1)
+        pin_code = sys.argv[2]
+        pushsi.register(pin_code)
+        print "Successfully registered this computer!"
+        return
+
+    if sys.argv[1].lower() in ('-s', '--status'):
+        phones = pushsi.status()
+        if not phones:
+            print "No phones currently hooked up to this computer."
+            return
+        print "%i phone%s currently hooked up to this computer:" % (
+            len(phones),
+            len(phones) != 1 and 's' or '',
+        )
+        print "Phone UUID:\tRegistered:"
+        for phone in phones:
+            created = datetime.datetime.fromtimestamp(phone['created'])
+            print "%s\t%s" % (phone['phone_uuid'], created)
+        return
+
+    pieces = sys.argv[1:]
+    verbose = False
+    if pieces[1].lower() in ('-v', '--verbose'):
+        verbose = True
+        pieces = pieces[1:]
+    if not pieces:
+        print "Error: must specify a command"
+        sys.exit(1)
+    cmd = " ".join(pieces)
+
+    timestamp = time.time()
+    p = subprocess.Popen(cmd, shell=True)
+    returncode = p.wait()
+    elapsed = time.time() - timestamp
+
+    message = "Command: %s Exit status: %s" % (cmd, returncode)
+    params = {
+        'message': message,
+        'command': cmd,
+        'return_code': returncode,
+        'elapsed_time_seconds': elapsed
+    }
+    data = pushsi.pushsi(params)
+    if verbose:
+        print "%s push message%s sent" % (
+            data['messages_sent'],
+            int(data['messages_sent']) != 1 and 's' or '',
+        )
+
+
+if __name__ == '__main__':
     main()
-except PushsiException, e:
-    print "Error: %s" % e
-
