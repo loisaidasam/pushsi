@@ -1,0 +1,15 @@
+# Standard ignores
+*.log
+*.pyc
+*.pid
+
+# Eclipse
+.project
+.pydevproject
+
+# bin ish
+pushsi/bin/build/*
+
+# Project ish
+pushsi/localsettings.py
+pushsi/runserver.sh

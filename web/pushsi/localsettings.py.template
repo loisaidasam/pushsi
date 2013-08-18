@@ -1,0 +1,28 @@
+
+ADMINS = (
+	('Your Name', 'your.email@example.com'),
+)
+
+MANAGERS = ADMINS
+
+DATABASES = {
+	'default': {
+		'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
+		'NAME': 'pushsi',					  # Or path to database file if using sqlite3.
+		'USER': 'pushsi',					  # Not used with sqlite3.
+		'PASSWORD': 'pushsi',				  # Not used with sqlite3.
+		'HOST': '',					  # Set to empty string for localhost. Not used with sqlite3.
+		'PORT': '',					  # Set to empty string for default. Not used with sqlite3.
+	}
+}
+
+TIME_ZONE = 'Europe/Ljubljana'
+
+# Django secret key
+SECRET_KEY = '(2j==1ei=94z0&!8c6x)#qo76cf9s94x3q1l+fxdeg9^tj&)n4'
+
+# Get this at https://developers.google.com/android/c2dm/
+GOOGLE_AUTH_TOKEN = 'your token here'
+
+# Make a list of random things for your app (for making hashes)
+RANDOM_THINGS = ['taco salad', 'french kissing', 'sufjan stevens']

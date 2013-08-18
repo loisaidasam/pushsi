@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pushsi</string>
+    
+    <string name="main_text">Howdy!</string>
+    <string name="register_text">REGISTER A COMPUTER</string>
+    <string name="error_uuid">Error: Unable to create a unique device identifier. Please try again.</string>
+    <string name="error_c2dm">Error: Unable to register device with C2DM. Please try again.</string>
+    <string name="registration_success">Successfully registered device!</string>
+    <string name="registration_failure_general">Error: unable to register device at this time, please try again.</string>
+    <string name="registration_failure_expired">Error: pin code expired. Please try again.</string>
+    
+    <string name="uuid_type">device</string>
+    <string name="pin_validity_seconds">60</string>
+
+    
+    <string name="c2dm_sender_email">PUT EMAIL ADDRESS HERE!</string>
+    <string name="api_endpoint">http://push.si/api</string>
+
+</resources>

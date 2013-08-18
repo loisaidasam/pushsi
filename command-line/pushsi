@@ -1,0 +1,178 @@
+#!/usr/bin/env python
+
+import datetime
+import hashlib
+import json
+from optparse import OptionParser
+import os
+import subprocess
+import sys
+import urllib
+import urllib2
+
+
+API_ENDPOINT = "http://push.si/api"
+
+
+class PushsiException(Exception):
+	pass
+
+
+def _get_hash():
+	home_dir = os.path.expanduser("~")
+	
+	try:
+		fp = open("%s/.PUSHSI_HASH" % home_dir, 'r')
+		hash = fp.read()
+		if not hash:
+			raise PushsiException("Empty hash file")
+		return hash
+	except IOError:
+		pass
+	except PushsiException:
+		pass
+	
+	url = '%s/computer/register' % API_ENDPOINT
+	data = urllib.urlencode({})
+	req = urllib2.Request(url, data)
+	try:
+		response = urllib2.urlopen(req)
+	except urllib2.HTTPError, e:
+		response_dict = json.loads(e.read())
+		raise PushsiException(response_dict.get('error', e))
+	
+	response_dict = json.loads(response.read())
+	if response.code != 200:
+		raise PushsiException(response_dict.get('error'))
+	
+	hash = response_dict.get('hash')
+	if not hash:
+		raise PushsiException("No hash returned!")
+	
+	fp = open("%s/.PUSHSI_HASH" % home_dir, 'w')
+	fp.write(hash)
+	fp.close()
+	return hash
+
+
+def _register(args, hash):
+	def _usage():
+		print "Usage: %s --register <pin code>" % __file__
+	
+	if len(args) != 1:
+		return _usage()
+	
+	pin_code = args[0]
+	
+	url = '%s/pin/resolve' % API_ENDPOINT
+	params = {
+		'hash': hash,
+		'pin_code': pin_code,
+	}
+
+	data = urllib.urlencode(params)
+	req = urllib2.Request(url, data)
+	try:
+		response = urllib2.urlopen(req)
+	except urllib2.HTTPError, e:
+		response_dict = json.loads(e.read())
+		raise PushsiException(response_dict.get('error', e))
+	
+	response_dict = json.loads(response.read())
+	if response.code != 200:
+		raise PushsiException(response_dict.get('error'))
+	
+	status = response_dict.get('status')
+	if not status:
+		raise PushsiException("Unknown error trying to reconcile pin")
+	
+	print "Success!"
+	
+
+def _status(hash):
+	url = '%s/computer/status?hash=%s' % (API_ENDPOINT, hash)
+	req = urllib2.Request(url)
+	try:
+		response = urllib2.urlopen(req)
+	except urllib2.HTTPError, e:
+		response_dict = json.loads(e.read())
+		raise PushsiException(response_dict.get('error', e))
+	
+	response_dict = json.loads(response.read())
+	if response.code != 200:
+		raise PushsiException(response_dict.get('error'))
+	
+	phones = response_dict.get('phones')
+	if not phones:
+		print "No phones currently hooked up to this computer."
+		return
+	
+	print "%i phone%s currently hooked up to this computer:" % (
+		len(phones),
+		len(phones) != 1 and 's' or '',
+	)
+	print "Phone UUID:\tRegistered:"
+	for phone in phones:
+		created = datetime.datetime.fromtimestamp(phone['created'])
+		print "%s\t%s" % (phone['phone_uuid'], created)
+
+
+def _pushsi(cmd, hash, verbose):
+	def _usage():
+		print "Usage: %s <some command>" % __file__
+	
+	if not cmd:
+		return _usage()
+	
+	p = subprocess.Popen(cmd, shell=True)
+	returncode = p.wait()
+	
+	message = "Command: %s Exit status: %s" % (cmd, returncode)
+	
+	url = '%s/push' % API_ENDPOINT
+	params = {'hash': hash, 'message': message}
+	data = urllib.urlencode(params)
+	req = urllib2.Request(url, data)
+	try:
+		response = urllib2.urlopen(req)
+	except urllib2.HTTPError, e:
+		response_dict = json.loads(e.read())
+		raise PushsiException(response_dict.get('error', e))
+	
+	response_dict = json.loads(response.read())
+	if response.code != 200:
+		raise PushsiException(response_dict.get('error'))
+	
+	if verbose:
+		print "%s push message%s sent" % (
+			response_dict['messages_sent'],
+			int(response_dict['messages_sent']) != 1 and 's' or '',
+		)
+
+
+def main():
+	hash = _get_hash()
+	
+	parser = OptionParser()
+	help_text = "Register a phone by entering a pin"
+	parser.add_option("-r", "--register", action="store_true", dest="register", default=False, help=help_text)
+	help_text = "Check the status of this computer - show which phones are hooked up to it"
+	parser.add_option("-s", "--status", action="store_true", dest="status", default=False, help=help_text)
+	help_text = "Be extra verbose about the push messages that are sent"
+	parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False, help=help_text)
+	(options, args) = parser.parse_args()
+	
+	if options.register:
+		return _register(args, hash)
+	
+	if options.status:
+		return _status(hash)
+	
+	cmd = " ".join(args)
+	return _pushsi(cmd, hash, options.verbose)
+
+try:
+	main()
+except PushsiException, e:
+	print "Error: %s" % e
+
