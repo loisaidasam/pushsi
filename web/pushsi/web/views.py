@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 @csrf_protect
 def index(request):
-	context = {
-		'phones': Phone.objects.all().count(),
-		'computers': Computer.objects.all().count(),
-		'pushes': PushAlert.objects.all().count(),
-	}
-	return render_to_response('index.html', context, RequestContext(request))
+    context = {
+        'phones': Phone.objects.all().count(),
+        'computers': Computer.objects.all().count(),
+        'pushes': PushAlert.objects.all().count(),
+    }
+    return render_to_response('index.html', context, RequestContext(request))
