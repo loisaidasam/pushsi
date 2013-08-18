@@ -193,7 +193,7 @@ def push(request):
     
     # Dem QueryDict objects...
     # https://docs.djangoproject.com/en/dev/ref/request-response/#querydict-objects
-    data = {k: v[0] for k, v in request.POST.iterlists()}
+    data = dict(request.POST.iteritems())
     del data['hash']
 
     messages_sent = 0
