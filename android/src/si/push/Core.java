@@ -21,6 +21,8 @@ public class Core {
 
 	public static String KEY_REGISTRATION_ID = "registration_id";
 	public static String KEY_UUID = "uuid";
+	public static String KEY_DB_LAST_UPDATED = "db_last_updated";
+	public static String KEY_ALERT_ID = "alert_id";
 	
 	private static final String TAG = "Pushsi_Core";
 	

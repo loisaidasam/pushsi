@@ -1,5 +1,12 @@
 package si.push;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -78,11 +85,39 @@ public class C2DMReceiver extends BroadcastReceiver {
 		Bundle b = intent.getExtras();
 		String message = b.getString("message");
 		Log.i(TAG, "received message:" + message);
+
+		// Decode the JSON Object
+		JSONObject jsonObject;
+		try {
+			jsonObject = new JSONObject(message);
+		} catch (JSONException e) {
+			Log.e(TAG, "Error decoding JSON from received message");
+			e.printStackTrace();
+			return;
+		}
+		List<KeyValuePair> keyValuePairs = new ArrayList<KeyValuePair>();
+		Iterator<?> iter = jsonObject.keys();
+	    while (iter.hasNext()) {
+	        String key = (String) iter.next();
+	        try {
+	            String value = jsonObject.getString(key);
+	            keyValuePairs.add(new KeyValuePair(key, value));
+	        } catch (JSONException e) {
+				Log.e(TAG, "Error decoding JSON from received message");
+				e.printStackTrace();
+				return;
+	        }
+	    }
+	    
+	    // And save the data
+		PushsiDBHelper mDBHelper = new PushsiDBHelper(context);
+	    long alertId = mDBHelper.createAlert();
+	    mDBHelper.addAlertData(alertId, keyValuePairs);
 		
 		// Do whatever you want with the message
 		//Toast.makeText(context, "RECEIVED A MESSAGE!", Toast.LENGTH_SHORT).show();
 
-		// TODO: obviously expand on this...
+		// TODO: obviously expand upon this...
 		
 		String ns = Context.NOTIFICATION_SERVICE;
 		NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(ns);
@@ -96,7 +131,8 @@ public class C2DMReceiver extends BroadcastReceiver {
 		CharSequence contentTitle = "Push.si";  // message title
 		CharSequence contentText = message;      // message text
 		
-		Intent notificationIntent = new Intent(context, PushsiActivity.class);
+		Intent notificationIntent = new Intent(context, PushsiAlertActivity.class);
+		notificationIntent.putExtra(Core.KEY_ALERT_ID, alertId);
 		PendingIntent contentIntent = PendingIntent.getActivity(context, 0, notificationIntent, 0);
 
 		notification.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
