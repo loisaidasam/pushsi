@@ -129,9 +129,9 @@ def main():
 
     pieces = sys.argv[1:]
     verbose = False
-    if pieces[1].lower() in ('-v', '--verbose'):
-        verbose = True
-        pieces = pieces[1:]
+    # if pieces[1].lower() in ('-v', '--verbose'):
+    #     verbose = True
+    #     pieces = pieces[1:]
     if not pieces:
         print "Error: must specify a command"
         sys.exit(1)
