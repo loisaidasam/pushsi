@@ -194,7 +194,10 @@ def push(request):
     # Dem QueryDict objects...
     # https://docs.djangoproject.com/en/dev/ref/request-response/#querydict-objects
     data = dict(request.POST.iteritems())
+    new_data = {}
     del data['hash']
+    for key, value in data.iteritems():
+        new_data[unicode(key)] = unicode(value)
 
     messages_sent = 0
     
@@ -202,7 +205,7 @@ def push(request):
     for link in links:
         phone = link.phone
         try:
-            alert_id = PushAlert.send_push(phone, data)
+            alert_id = PushAlert.send_push(phone, new_data)
             if alert_id:
                 messages_sent += 1
         except PushException, e:
