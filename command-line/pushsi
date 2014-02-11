@@ -17,10 +17,9 @@ class EmptyHashError(Exception):
     pass
 
 
-class RequestError(Exception):
+class InvalidRequestError(Exception):
     def __init__(self, error):
-        self.error = error
-        super(RequestError, self).__init__(error)
+        super(InvalidRequestError, self).__init__(error)
 
 
 class Pushsi(object):
@@ -31,18 +30,16 @@ class Pushsi(object):
 
     def _make_request(self, endpoint, data=None, request_type='POST'):
         url = '%s/%s' % (API_ENDPOINT, endpoint)
-        try:
-            if request_type == 'POST':
-                response = requests.post(url, data=data)
-            elif request_type == 'GET':
-                response = requests.get(url, params=data)
-            else:
-                raise RequestError("Invalid request_type")
-        except Exception, e:
-            raise RequestError(e)
-        if response.status_code != 200:
-            response_json = json.loads(response.text)
-            raise RequestError(response_json.get('error'))
+        if request_type == 'POST':
+            response = requests.post(url, data=data)
+        elif request_type == 'GET':
+            response = requests.get(url, params=data)
+        else:
+            raise InvalidRequestError("Invalid request_type")
+        response.raise_for_status()
+        # if response.status_code != 200:
+        #     response_json = json.loads(response.text)
+        #     raise RequestError(response_json.get('error'))
         return response.json()
 
     def _get_hash(self):
